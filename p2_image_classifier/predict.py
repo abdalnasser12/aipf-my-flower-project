@@ -6,7 +6,6 @@ import tensorflow_hub as hub
 from PIL import Image
 import logging
 
-
 logger = tf.get_logger()
 logger.setLevel(logging.ERROR)
 
@@ -14,7 +13,7 @@ def process_image(image_np, target_size=(224, 224)):
     """يعالج صورة NumPy لتكون جاهزة للنموذج."""
     image = tf.convert_to_tensor(image_np, dtype=tf.float32)
     image = tf.image.resize(image, target_size)
-    image /= 255.0  
+    image /= 255.0 
     return image.numpy()
 
 def predict(image_path, model, top_k):
@@ -28,12 +27,8 @@ def predict(image_path, model, top_k):
 
     processed_image = process_image(image_np)
     expanded_image = np.expand_dims(processed_image, axis=0)
-
     predictions = model.predict(expanded_image)
-
-   
     probs, indices = tf.math.top_k(predictions, k=top_k)
-
     return probs.numpy()[0], indices.numpy()[0]
 
 def main():
@@ -46,18 +41,12 @@ def main():
     
     args = parser.parse_args()
 
-    
     if not args.gpu:
         tf.config.set_visible_devices([], 'GPU')
-        print("Running inference on CPU.")
     else:
-        gpus = tf.config.list_physical_devices('GPU')
-        if gpus:
-            print(f"Running inference on GPU: {gpus[0].name}")
-        else:
+        if not tf.config.list_physical_devices('GPU'):
             print("GPU requested but not available. Running on CPU.")
 
-    
     try:
         model = tf.keras.models.load_model(
             args.model_path,
@@ -66,17 +55,12 @@ def main():
     except (FileNotFoundError, IOError):
         print(f"Error: Model file not found at {args.model_path}")
         return
-    except Exception as e:
-        print(f"An error occurred while loading the model: {e}")
-        return
         
- 
     probs, indices = predict(args.image_path, model, args.top_k)
     
     if probs is None:
-        return 
+        return
 
-    
     class_names = None
     if args.category_names:
         try:
@@ -84,20 +68,21 @@ def main():
                 class_names = json.load(f)
         except FileNotFoundError:
             print(f"Warning: Category names file not found at {args.category_names}. Displaying indices instead.")
-        except json.JSONDecodeError:
-            print(f"Warning: Could not decode JSON from {args.category_names}. Displaying indices instead.")
-    
+            return
+
     print(f"\nTop {args.top_k} Predictions:")
     print("-" * 30)
 
     for i in range(args.top_k):
         prob = probs[i]
-        class_index_str = str(indices[i] + 1) 
+        class_index = indices[i] 
         
         if class_names:
-            name = class_names.get(class_index_str, f"Unknown Index: {class_index_str}")
+            
+            lookup_key = str(class_index + 1)
+            name = class_names.get(lookup_key, f"Unknown Index: {lookup_key}")
         else:
-            name = f"Index: {class_index_str}"
+            name = f"Index: {class_index}"
             
         print(f"{i+1}: {name:<25} | Probability: {prob:.4f}")
 
